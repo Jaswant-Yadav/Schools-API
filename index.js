@@ -3,38 +3,72 @@ const connectdb = require('./config');
 const app = express();
 app.use(express.json());
 
-// ALL list
-app.get('/' ,(req,resp)=>{
-   connectdb.query("select * from schools",(err,result)=>{
-    if(err){
-        resp.send("error in fetching")
-    }else{
-        resp.send(result)
-    }
-   })
+// ALL list 
+app.get('/', (req, resp) => {
+    connectdb.query("select * from schools", (err, result) => {
+        if (err) {
+            resp.status(500).json({
+                success: false,
+                message: "Error fetching schools",
+                error: err
+            });
+        } else {
+            resp.json({
+                success: true,
+                data: result
+            });
+        }
+    });
 });
 
 // ADD School API
-app.post('/addSchool',(req,resp) => {
+app.post('/addSchool', (req, resp) => {
     const { name, address, latitude, longitude } = req.body;
 
+    // Input validation
     if (!name || !address || !latitude || !longitude) {
-        return resp.json({ message: 'All fields are required' });
+        return resp.status(400).json({ 
+            success: false,
+            message: 'All fields are required (name, address, latitude, longitude)' 
+        });
+    }
+
+    // Validate latitude and longitude
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return resp.status(400).json({ 
+            success: false, 
+            message: 'Invalid latitude or longitude values' 
+        });
     }
 
     const query = 'INSERT INTO schools (name, address, latitude, longitude) VALUES (?, ?, ?, ?)';
-    connectdb.query(query, [name, address, latitude, longitude], (err) => {
+    connectdb.query(query, [name, address, lat, lng], (err, result) => {
         if (err) {
-            console.error(err);
-            return resp.json({ message: 'Database error' });
+            console.error('Database error:', err);
+            return resp.status(500).json({ 
+                success: false,
+                message: 'Database error',
+                error: err.message 
+            });
         }
-        resp.json({ message: 'School added successfully' });
+        resp.status(201).json({ 
+            success: true,
+            message: 'School added successfully',
+            data: {
+                id: result.insertId,
+                name,
+                address,
+                latitude: lat,
+                longitude: lng
+            }
+        });
     });
 });
 
 // List Schools API
-
-app.get('/listSchools', (req,resp) => {
+app.get('/listSchools', (req, resp) => {
     const { latitude, longitude, radius } = req.query;
     const maxRadius = parseFloat(radius) || 50; // Default 50km radius if not specified
 
@@ -44,7 +78,11 @@ app.get('/listSchools', (req,resp) => {
         connectdb.query(query, (err, result) => {
             if (err) {
                 console.error('Database error:', err);
-                return resp.json({ success: false, message: 'Database error' });
+                return resp.status(500).json({ 
+                    success: false, 
+                    message: 'Database error',
+                    error: err.message 
+                });
             }
             return resp.json({
                 success: true,
@@ -58,14 +96,21 @@ app.get('/listSchools', (req,resp) => {
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
     if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return resp.json({ success: false, message: 'Invalid latitude or longitude values' });
+        return resp.status(400).json({ 
+            success: false, 
+            message: 'Invalid latitude or longitude values' 
+        });
     }
 
     const query = 'SELECT id, name, address, latitude, longitude FROM schools';
     connectdb.query(query, (err, result) => {
         if (err) {
             console.error('Database error:', err);
-            return resp.json({ success: false, message: 'Database error' });
+            return resp.status(500).json({ 
+                success: false, 
+                message: 'Database error',
+                error: err.message 
+            });
         }
 
         if (!result || result.length === 0) {
@@ -96,7 +141,11 @@ app.get('/listSchools', (req,resp) => {
             });
         } catch(error) {
             console.error('Distance calculation error:', error);
-            resp.json({ success: false, message: 'Error calculating distances' });
+            resp.status(500).json({ 
+                success: false, 
+                message: 'Error calculating distances',
+                error: error.message 
+            });
         }
     });
 });
@@ -119,4 +168,7 @@ function haversineDistance(coord1, coord2) {
     return R * c; // Distance in km
 }
 
-app.listen(5000);
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
