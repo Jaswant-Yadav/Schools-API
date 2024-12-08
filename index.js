@@ -168,7 +168,7 @@ function haversineDistance(coord1, coord2) {
     return R * c; // Distance in km
 }
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4500;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
